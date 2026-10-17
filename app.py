@@ -14,7 +14,6 @@ from flask_jwt_extended import (
 from dotenv import load_dotenv
 from bson import ObjectId
 from bson.json_util import dumps
-import numpy as np
 
 # ── App setup ──────────────────────────────────────────────────
 load_dotenv()
@@ -39,19 +38,94 @@ app = Flask(
     template_folder=os.path.join(BASE_DIR, "templates"),
     static_folder=os.path.join(BASE_DIR, "static")
 )
-app.config["MONGO_URI"]         = os.getenv("MONGO_URI", "mongodb://localhost:27017/shieldwise")
+app.config["MONGO_URI"]         = os.getenv("MONGO_URI", "")
 app.config["SECRET_KEY"]        = os.getenv("SECRET_KEY", "dev-secret")
 app.config["JWT_SECRET_KEY"]    = os.getenv("JWT_SECRET_KEY", "dev-jwt-secret")
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = datetime.timedelta(days=7)
 
-mongo  = PyMongo(app)
 bcrypt = Bcrypt(app)
 jwt    = JWTManager(app)
 
+mongo = None
+mongo_uri = app.config["MONGO_URI"]
+if mongo_uri and "cluster0.xxxxx.mongodb.net" not in mongo_uri and "<username>" not in mongo_uri:
+    try:
+        mongo = PyMongo(app)
+        print(" Connected to MongoDB")
+    except Exception as e:
+        print(f" MongoDB connection error: {e}")
+        mongo = None
+else:
+    print(" Running with in-memory fallback (No valid MongoDB URI configured)")
+
+class SafeCollection:
+    def __init__(self, name):
+        self.name = name
+        self._data = []
+    def find_one(self, filter=None, *args, **kwargs):
+        if not filter:
+            return self._data[0] if self._data else None
+        for item in self._data:
+            match = True
+            for k, v in filter.items():
+                if k == "_id" and str(item.get("_id")) == str(v):
+                    continue
+                if item.get(k) != v:
+                    match = False
+                    break
+            if match:
+                return item
+        return None
+    def find(self, *args, **kwargs):
+        class Cursor:
+            def __init__(self, items):
+                self._items = items
+            def sort(self, *a, **k): return self
+            def limit(self, *a, **k): return self
+            def __iter__(self): return iter(self._items)
+        return Cursor(self._data)
+    def insert_one(self, doc):
+        if "_id" not in doc:
+            doc["_id"] = str(ObjectId())
+        self._data.append(doc)
+        return doc
+    def update_one(self, filter, update, *args, **kwargs):
+        doc = self.find_one(filter)
+        if doc and "$set" in update:
+            doc.update(update["$set"])
+    def count_documents(self, filter=None, *args, **kwargs):
+        if not filter:
+            return len(self._data)
+        return sum(1 for item in self._data if all(item.get(k) == v for k, v in filter.items() if k != "_id"))
+
+_safe_users = SafeCollection("users")
+_safe_fraud = SafeCollection("fraud_logs")
+_safe_txn   = SafeCollection("transaction_logs")
+
 # Shorthand collections
-def users():    return mongo.db.users
-def fraud_logs(): return mongo.db.fraud_logs
-def txn_logs():   return mongo.db.transaction_logs
+def users():
+    if mongo and getattr(mongo, "db", None) is not None:
+        try:
+            return mongo.db.users
+        except Exception:
+            pass
+    return _safe_users
+
+def fraud_logs():
+    if mongo and getattr(mongo, "db", None) is not None:
+        try:
+            return mongo.db.fraud_logs
+        except Exception:
+            pass
+    return _safe_fraud
+
+def txn_logs():
+    if mongo and getattr(mongo, "db", None) is not None:
+        try:
+            return mongo.db.transaction_logs
+        except Exception:
+            pass
+    return _safe_txn
 
 # ── Helpers ────────────────────────────────────────────────────
 def obj_to_dict(doc):
@@ -220,10 +294,15 @@ def fraud_check():
     message     = data.get("message", "")
 
     if USE_MODEL:
-        # Build feature vector matching your training schema
-        features = np.array([[amt, txn_type, vpa, acct_age, hour_bucket, message]])
-        score = int(FRAUD_MODEL.predict_proba(features)[0][1] * 100)
-        breakdown = {}
+        try:
+            import numpy as np
+            features = np.array([[amt, txn_type, vpa, acct_age, hour_bucket, message]])
+            score = int(FRAUD_MODEL.predict_proba(features)[0][1] * 100)
+            breakdown = {}
+        except Exception:
+            result = rule_fraud_score(amt, txn_type, vpa, acct_age, hour_bucket, message)
+            score = result["overall"]
+            breakdown = result["breakdown"]
     else:
         result    = rule_fraud_score(amt, txn_type, vpa, acct_age, hour_bucket, message)
         score     = result["overall"]
@@ -231,21 +310,24 @@ def fraud_check():
 
     verdict = "danger" if score >= 60 else ("warn" if score >= 35 else "safe")
 
-    # Persist to MongoDB
-    log_entry = {
-        "user_id":      uid,
-        "amount":       amt,
-        "txn_type":     txn_type,
-        "vpa":          vpa,
-        "acct_age":     acct_age,
-        "hour_bucket":  hour_bucket,
-        "message":      message,
-        "score":        score,
-        "verdict":      verdict,
-        "breakdown":    breakdown,
-        "checked_at":   datetime.datetime.utcnow(),
-    }
-    fraud_logs().insert_one(log_entry)
+    # Persist to MongoDB if available
+    try:
+        log_entry = {
+            "user_id":      uid,
+            "amount":       amt,
+            "txn_type":     txn_type,
+            "vpa":          vpa,
+            "acct_age":     acct_age,
+            "hour_bucket":  hour_bucket,
+            "message":      message,
+            "score":        score,
+            "verdict":      verdict,
+            "breakdown":    breakdown,
+            "checked_at":   datetime.datetime.utcnow(),
+        }
+        fraud_logs().insert_one(log_entry)
+    except Exception as e:
+        print(f"MongoDB log warning: {e}")
 
     return jsonify({
         "score":     score,

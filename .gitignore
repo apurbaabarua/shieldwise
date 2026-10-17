@@ -18,3 +18,5 @@ models/fraud_model.pkl
 # OS
 .DS_Store
 Thumbs.db
+
+.vercel
