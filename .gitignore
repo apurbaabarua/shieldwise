@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+env/
+.env
+
+# Model
+models/fraud_model.pkl
+
+# VS Code
+.vscode/
+
+# Vercel
+.vercel/
+
+# OS
+.DS_Store
+Thumbs.db

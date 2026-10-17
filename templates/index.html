@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ShieldWise — Smart UPI Wallet</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="/static/css/style.css"/>
+</head>
+<body>
+
+<!-- ══ AUTH MODAL ══ -->
+<div id="auth-overlay" class="auth-overlay">
+  <div class="auth-card">
+    <div class="auth-logo"><span>S</span></div>
+    <h1 class="auth-title">ShieldWise</h1>
+    <p class="auth-sub">Smart UPI Wallet</p>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-login" onclick="authTab('login')">Login</button>
+      <button class="auth-tab" id="tab-register" onclick="authTab('register')">Register</button>
+    </div>
+
+    <!-- LOGIN -->
+    <div id="form-login">
+      <div class="inp-wrap"><label class="inp-label">Email</label><input type="email" id="l-email" placeholder="you@example.com"/></div>
+      <div class="inp-wrap"><label class="inp-label">Password</label><input type="password" id="l-pass" placeholder="••••••••"/></div>
+      <div class="auth-err" id="l-err"></div>
+      <button class="btn-blue w100" onclick="doLogin()"><i class="ti ti-login"></i> Login</button>
+      <p class="auth-hint">Demo: test@shieldwise.com / test1234</p>
+    </div>
+
+    <!-- REGISTER -->
+    <div id="form-register" style="display:none">
+      <div class="inp-wrap"><label class="inp-label">Full name</label><input type="text" id="r-name" placeholder="Apurba Das"/></div>
+      <div class="inp-wrap"><label class="inp-label">Email</label><input type="email" id="r-email" placeholder="you@example.com"/></div>
+      <div class="inp-wrap"><label class="inp-label">Phone</label><input type="tel" id="r-phone" placeholder="+91 9876543210"/></div>
+      <div class="inp-wrap"><label class="inp-label">Password</label><input type="password" id="r-pass" placeholder="Min 8 characters"/></div>
+      <div class="auth-err" id="r-err"></div>
+      <button class="btn-blue w100" onclick="doRegister()"><i class="ti ti-user-plus"></i> Create account</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SPLASH ══ -->
+<div id="splash">
+  <div class="sp-ring"><span class="sp-s">S</span></div>
+  <div class="sp-name">ShieldWise</div>
+  <div class="sp-sub">Your smart UPI wallet</div>
+  <div class="sp-dots"><div class="sp-dot"></div><div class="sp-dot"></div><div class="sp-dot"></div></div>
+</div>
+
+<!-- ══ WALLET FLIP ══ -->
+<div id="wflip">
+  <div class="wc-wrap">
+    <div class="wcard">
+      <div class="wcard-face">
+        <div class="wchip"></div>
+        <div class="wnum">•••• •••• •••• 4821</div>
+        <div class="wbottom">
+          <div class="wname" id="card-name">LOADING…</div>
+          <div class="wbal"><div class="wbal-lbl">BALANCE</div><div class="wbal-amt" id="card-bal">₹0</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="wtag">Opening your wallet…</div>
+  </div>
+</div>
+
+<!-- ══ APP SHELL ══ -->
+<div id="shell">
+
+  <!-- SIDEBAR (desktop) -->
+  <div class="sidebar">
+    <div class="sb-brand">
+      <div class="sb-logo-row">
+        <div class="sb-logo"><span>S</span></div>
+        <div><div class="sb-app">ShieldWise</div><div class="sb-sub2">Smart UPI Wallet</div></div>
+      </div>
+    </div>
+    <div class="sb-nav">
+      <button class="sb-item act" id="sbn-home"    onclick="nav('home')"><i class="ti ti-home"></i><span>Home</span></button>
+      <button class="sb-item"     id="sbn-check"   onclick="nav('check')"><i class="ti ti-shield-check"></i><span>Fraud Check</span></button>
+      <button class="sb-item"     id="sbn-limits"  onclick="nav('limits')"><i class="ti ti-gauge"></i><span>Spend Limits</span></button>
+      <button class="sb-item"     id="sbn-goals"   onclick="nav('goals')">
+        <svg class="sb-dart" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg"><circle cx="22" cy="22" r="21" fill="#e53935"/><circle cx="22" cy="22" r="16" fill="#fff"/><circle cx="22" cy="22" r="11" fill="#e53935"/><circle cx="22" cy="22" r="6" fill="#fff"/><circle cx="22" cy="22" r="3" fill="#e53935"/><line x1="33" y1="11" x2="23" y2="21" stroke="#1a1a1a" stroke-width="2.4" stroke-linecap="round"/><polygon points="36,7 38,13 32,12" fill="#1a1a1a"/></svg>
+        <span>Save Goals</span>
+      </button>
+      <button class="sb-item"     id="sbn-profile" onclick="nav('profile')"><i class="ti ti-user-circle"></i><span>Profile</span></button>
+      <button class="sb-item"     id="sbn-alerts"  onclick="nav('alerts')"><i class="ti ti-bell"></i><span>Alerts</span><span class="nb" id="d-nb">0</span></button>
+    </div>
+    <div class="sb-bottom">
+      <div class="sb-bal-card">
+        <div class="sbc-lbl">Available balance</div>
+        <div class="sbc-amt" id="d-bal">₹0</div>
+        <div class="sbc-sub3" id="d-spent">Spent today: ₹0</div>
+      </div>
+      <button class="btn-logout" onclick="doLogout()"><i class="ti ti-logout"></i> Logout</button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="desktop-main">
+    <div class="d-topbar">
+      <div class="d-title" id="d-title">Home</div>
+      <div class="d-right">
+        <div class="d-icon" onclick="nav('alerts')"><i class="ti ti-bell"></i><span class="d-badge" id="d-dbadge"></span></div>
+        <div class="d-avatar" id="d-avatar">A</div>
+      </div>
+    </div>
+    <div class="m-topbar">
+      <div class="m-tl">
+        <div class="m-logo"><span>S</span></div>
+        <div><div class="m-tname">ShieldWise</div><div class="m-tsub">Smart UPI wallet</div></div>
+      </div>
+      <div class="m-tright">
+        <div class="nw" onclick="nav('alerts')"><i class="ti ti-bell"></i><span class="nd" id="m-nd"></span></div>
+        <div class="m-avatar" id="m-avatar" onclick="nav('profile')">A</div>
+      </div>
+    </div>
+
+    <div id="app-content">
+
+      <!-- HOME -->
+      <div class="page show" id="page-home">
+        <div class="home-hero">
+          <div class="hero-greet">Good morning,</div>
+          <div class="hero-name" id="h-greet-name">User 👋</div>
+          <div class="hero-card">
+            <div class="hc-lbl">Total balance</div>
+            <div class="hc-amt" id="h-bal">₹0</div>
+            <div class="hc-sub" id="h-spent-label">Spent today: ₹0</div>
+            <div class="hc-stats">
+              <div class="hcs"><div class="hcs-v" id="h-month">₹0</div><div class="hcs-l">This month</div></div>
+              <div class="hcs"><div class="hcs-v" id="h-limit">₹0</div><div class="hcs-l">Monthly limit</div></div>
+              <div class="hcs"><div class="hcs-v" id="h-goals-count">0</div><div class="hcs-l">Goals active</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="qa-section asl" id="ha1">
+          <div class="sec-lbl" style="margin-bottom:14px">Quick actions</div>
+          <div class="qa-grid">
+            <div class="qa-item" onclick="nav('check')"><div class="qa-icon" style="background:#eff6ff"><i class="ti ti-shield-check" style="color:#2563eb"></i></div><div class="qa-lbl">Fraud check</div></div>
+            <div class="qa-item" onclick="nav('limits')"><div class="qa-icon" style="background:#f5f3ff"><i class="ti ti-gauge" style="color:#7c3aed"></i></div><div class="qa-lbl">Spend limits</div></div>
+            <div class="qa-item" onclick="nav('goals')"><div class="qa-icon" style="background:#fef9c3"><svg width="26" height="26" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg"><circle cx="22" cy="22" r="21" fill="#e53935"/><circle cx="22" cy="22" r="16" fill="#fff"/><circle cx="22" cy="22" r="11" fill="#e53935"/><circle cx="22" cy="22" r="6" fill="#fff"/><circle cx="22" cy="22" r="3" fill="#e53935"/><line x1="33" y1="11" x2="23" y2="21" stroke="#1a1a1a" stroke-width="2.4" stroke-linecap="round"/><polygon points="36,7 38,13 32,12" fill="#1a1a1a"/></svg></div><div class="qa-lbl">Goals</div></div>
+            <div class="qa-item" onclick="nav('profile')"><div class="qa-icon" style="background:#f0fdf4"><i class="ti ti-user-circle" style="color:#16a34a"></i></div><div class="qa-lbl">Profile</div></div>
+          </div>
+        </div>
+        <div class="body-pad asl" id="ha2">
+          <div class="sec-row"><div class="sec-lbl" style="margin:0">Fraud check history</div><div class="sec-link" onclick="nav('check')">Check now</div></div>
+          <div id="home-fraud-history"><div class="empty-state"><i class="ti ti-shield"></i><p>No fraud checks yet</p></div></div>
+        </div>
+        <div class="body-pad asl" id="ha3" style="padding-top:0">
+          <div class="sec-row"><div class="sec-lbl" style="margin:0">Savings goals</div><div class="sec-link" onclick="nav('goals')">View all</div></div>
+          <div class="goal-mini-grid" id="home-goals"><div class="empty-state"><i class="ti ti-target"></i><p>No goals yet</p></div></div>
+        </div>
+      </div>
+
+      <!-- FRAUD CHECK -->
+      <div class="page" id="page-check">
+        <div class="page-wrap">
+          <div class="d-2col">
+            <div>
+              <div class="alert-banner"><i class="ti ti-alert-triangle"></i><div class="ab-text"><strong>Stay alert — scams are rising</strong>Never share OTP or click links from unknown collect requests.</div></div>
+              <div class="card">
+                <div class="card-head"><i class="ti ti-shield-check"></i><span class="card-ht">Check before you pay</span></div>
+                <div class="card-body">
+                  <div class="inp-row"><div class="inp-wrap"><label class="inp-label">Amount</label><div class="amt-wrap"><span class="amt-pre">₹</span><input type="number" id="f-amt" placeholder="0.00"/></div></div><div class="inp-wrap"><label class="inp-label">Type</label><select id="f-type"><option value="p2p">Send money</option><option value="merchant">Pay merchant</option><option value="recharge">Recharge/bill</option><option value="collect">Collect request</option><option value="unknown">Unknown</option></select></div></div>
+                  <div class="inp-wrap"><label class="inp-label">Recipient UPI ID</label><input type="text" id="f-vpa" placeholder="e.g. friend@okaxis or kyc.update@ybl"/></div>
+                  <div class="inp-row"><div class="inp-wrap"><label class="inp-label">Account age</label><select id="f-age"><option value="old">Over 1 year</option><option value="mid">3–12 months</option><option value="new">Under 3 months</option><option value="fresh">Just created</option></select></div><div class="inp-wrap"><label class="inp-label">Time</label><select id="f-time"><option value="day">Morning/afternoon</option><option value="eve">Evening</option><option value="night">Late night</option></select></div></div>
+                  <div class="inp-wrap"><label class="inp-label">Message / reason given</label><input type="text" id="f-msg" placeholder="e.g. KYC update, prize won…"/></div>
+                  <button class="btn-blue w100" id="fcheckBtn" onclick="doCheck()"><i class="ti ti-shield-search"></i> Check now</button>
+                </div>
+              </div>
+              <div class="card" style="margin-top:14px">
+                <div class="card-head"><i class="ti ti-history"></i><span class="card-ht">Your check history</span></div>
+                <div id="fraud-history-list" style="padding:0 0 4px"></div>
+              </div>
+            </div>
+            <div id="f-result"><div class="fraud-placeholder"><i class="ti ti-shield"></i><p>Fill in transaction details and click <strong>Check now</strong> to get a fraud risk score.</p></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LIMITS -->
+      <div class="page" id="page-limits">
+        <div class="page-wrap">
+          <div class="d-2col">
+            <div>
+              <div class="sec-lbl">Monthly overview</div>
+              <div class="limit-ov"><div class="lo-top"><div><div class="lo-amt" id="lo-spent">₹0</div><div class="lo-of" id="lo-of">of ₹0 monthly limit</div></div><span class="lo-badge" id="lo-badge" style="background:#dcfce7;color:#166534">0%</span></div><div class="lo-trk"><div class="lo-fill" id="lo-bar" style="width:0%;background:#10b981"></div></div><div class="lo-lbl"><span>₹0</span><span id="lo-limit">₹0</span></div></div>
+              <div class="sec-lbl">By category</div>
+              <div class="cat-grid" id="catGrid"></div>
+              <div class="card"><div class="card-head"><i class="ti ti-credit-card"></i><span class="card-ht">Simulate a payment</span></div><div class="card-body"><div class="inp-row"><div class="inp-wrap"><label class="inp-label">Amount (₹)</label><div class="amt-wrap"><span class="amt-pre">₹</span><input type="number" id="s-amt" placeholder="500"/></div></div><div class="inp-wrap"><label class="inp-label">Category</label><select id="s-cat"><option value="food">Food</option><option value="shopping">Shopping</option><option value="travel">Travel</option><option value="other">Other</option></select></div></div><button class="btn-blue w100" onclick="simSpend()"><i class="ti ti-send"></i> Simulate payment</button></div></div>
+            </div>
+            <div>
+              <div class="card"><div class="card-head"><i class="ti ti-adjustments"></i><span class="card-ht">Set your limits</span></div><div class="card-body">
+                <div class="inp-wrap"><label class="inp-label">Monthly limit (₹)</label><div class="amt-wrap"><span class="amt-pre">₹</span><input type="number" id="l-monthly" placeholder="10000"/></div></div>
+                <div class="inp-row"><div class="inp-wrap"><label class="inp-label">Daily (₹)</label><div class="amt-wrap"><span class="amt-pre">₹</span><input type="number" id="l-daily" placeholder="2000"/></div></div><div class="inp-wrap"><label class="inp-label">Per txn (₹)</label><div class="amt-wrap"><span class="amt-pre">₹</span><input type="number" id="l-txn" placeholder="5000"/></div></div></div>
+                <div class="inp-row"><div class="inp-wrap"><label class="inp-label">Food (₹)</label><div class="amt-wrap"><span class="amt-pre">₹</span><input type="number" id="l-food" placeholder="3000"/></div></div><div class="inp-wrap"><label class="inp-label">Shopping (₹)</label><div class="amt-wrap"><span class="amt-pre">₹</span><input type="number" id="l-shop" placeholder="2000"/></div></div></div>
+                <div class="inp-row"><div class="inp-wrap"><label class="inp-label">Travel (₹)</label><div class="amt-wrap"><span class="amt-pre">₹</span><input type="number" id="l-travel" placeholder="1500"/></div></div><div class="inp-wrap"><label class="inp-label">Notify at</label><select id="l-notif"><option value="70">70%</option><option value="80" selected>80%</option><option value="90">90%</option><option value="100">100%</option></select></div></div>
+                <button class="btn-blue w100" onclick="saveLimits()"><i class="ti ti-device-floppy"></i> Save limits</button>
+              </div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GOALS -->
+      <div class="page" id="page-goals">
+        <div class="page-wrap">
+          <div class="d-2col">
+            <div>
+              <div class="sec-lbl">Your savings goals</div>
+              <div id="goalsContainer"></div>
+              <button class="add-goal-btn" onclick="toggleGoalForm()"><i class="ti ti-plus"></i> Add new goal</button>
+              <div class="add-form" id="goalForm">
+                <div><div class="inp-label" style="margin-bottom:8px">Choose an icon</div><div class="icon-grid" id="iconGrid"></div></div>
+                <div class="inp-wrap"><label class="inp-label">Goal name</label><input type="text" id="g-name" placeholder="e.g. New iPhone, Goa trip…"/></div>
+                <div class="inp-row"><div class="inp-wrap"><label class="inp-label">Target (₹)</label><div class="amt-wrap"><span class="amt-pre">₹</span><input type="number" id="g-target" placeholder="25000"/></div></div><div class="inp-wrap"><label class="inp-label">Monthly save (₹)</label><div class="amt-wrap"><span class="amt-pre">₹</span><input type="number" id="g-monthly" placeholder="2000"/></div></div></div>
+                <button class="btn-purple w100" onclick="addGoal()"><i class="ti ti-check"></i> Add goal</button>
+              </div>
+            </div>
+            <div>
+              <div class="card"><div class="card-head"><i class="ti ti-piggy-bank"></i><span class="card-ht">Add money to a goal</span></div><div class="card-body"><div class="inp-row"><div class="inp-wrap"><label class="inp-label">Goal</label><select id="g-pick"></select></div><div class="inp-wrap"><label class="inp-label">Amount (₹)</label><div class="amt-wrap"><span class="amt-pre">₹</span><input type="number" id="g-add" placeholder="500"/></div></div></div><button class="btn-purple w100" onclick="addToGoal()"><i class="ti ti-piggy-bank"></i> Save now</button></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROFILE -->
+      <div class="page" id="page-profile">
+        <div class="page-wrap" style="max-width:680px">
+          <div class="profile-header">
+            <div class="profile-avatar" id="p-avatar">A</div>
+            <div>
+              <div class="profile-name" id="p-name">Loading…</div>
+              <div class="profile-email" id="p-email">—</div>
+              <div class="profile-upi" id="p-upi">—</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><i class="ti ti-user-edit"></i><span class="card-ht">Edit profile</span></div>
+            <div class="card-body">
+              <div class="inp-row"><div class="inp-wrap"><label class="inp-label">Full name</label><input type="text" id="p-name-inp" placeholder="Your name"/></div><div class="inp-wrap"><label class="inp-label">Phone</label><input type="tel" id="p-phone-inp" placeholder="+91 …"/></div></div>
+              <div class="inp-wrap"><label class="inp-label">UPI ID</label><input type="text" id="p-upi-inp" placeholder="yourname@shieldwise"/></div>
+              <button class="btn-blue w100" onclick="saveProfile()"><i class="ti ti-device-floppy"></i> Save profile</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><i class="ti ti-chart-bar"></i><span class="card-ht">Your fraud check stats</span></div>
+            <div class="card-body">
+              <div class="stat-grid">
+                <div class="stat-tile" style="background:#eff6ff"><div class="st-val" id="st-total">0</div><div class="st-lbl">Total checks</div></div>
+                <div class="stat-tile" style="background:#fef2f2"><div class="st-val" id="st-frauds" style="color:#dc2626">0</div><div class="st-lbl">Frauds caught</div></div>
+                <div class="stat-tile" style="background:#f0fdf4"><div class="st-val" id="st-safe" style="color:#16a34a">0</div><div class="st-lbl">Safe passed</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><i class="ti ti-history"></i><span class="card-ht">Recent fraud checks (from DB)</span></div>
+            <div id="profile-fraud-log" style="padding:4px 0 8px"></div>
+          </div>
+          <button class="btn-logout w100 mt12" onclick="doLogout()"><i class="ti ti-logout"></i> Logout</button>
+        </div>
+      </div>
+
+      <!-- ALERTS -->
+      <div class="page" id="page-alerts">
+        <div class="page-wrap" style="max-width:640px">
+          <div class="sec-lbl">Notifications</div>
+          <div id="alertsList"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- MOBILE BOTTOM NAV -->
+    <div class="bottom-nav">
+      <div class="bn-item act" id="bn-home"    onclick="nav('home')"><i class="ti ti-home"></i><span>Home</span></div>
+      <div class="bn-item"     id="bn-check"   onclick="nav('check')"><i class="ti ti-shield-check"></i><span>Check</span></div>
+      <div class="bn-item"     id="bn-goals"   onclick="nav('goals')"><svg width="24" height="24" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg"><circle cx="22" cy="22" r="21" fill="#e53935"/><circle cx="22" cy="22" r="16" fill="#fff"/><circle cx="22" cy="22" r="11" fill="#e53935"/><circle cx="22" cy="22" r="6" fill="#fff"/><circle cx="22" cy="22" r="3" fill="#e53935"/><line x1="33" y1="11" x2="23" y2="21" stroke="#1a1a1a" stroke-width="2.4" stroke-linecap="round"/><polygon points="36,7 38,13 32,12" fill="#1a1a1a"/></svg><span>Goals</span></div>
+      <div class="bn-item"     id="bn-profile" onclick="nav('profile')"><i class="ti ti-user-circle"></i><span>Profile</span></div>
+      <div class="bn-item bn-rel" id="bn-alerts" onclick="nav('alerts')"><i class="ti ti-bell"></i><span>Alerts</span><span class="bn-adot" id="m-adot"></span></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"><i class="ti ti-check" id="t-ico"></i><span id="t-msg"></span></div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
