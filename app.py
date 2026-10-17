@@ -58,47 +58,128 @@ if mongo_uri and "cluster0.xxxxx.mongodb.net" not in mongo_uri and "<username>" 
 else:
     print(" Running with in-memory fallback (No valid MongoDB URI configured)")
 
+DEMO_USER_ID = "65f000000000000000000001"
+DEMO_EMAIL   = "test@shieldwise.com"
+DEMO_PW_HASH = bcrypt.generate_password_hash("test1234").decode("utf-8")
+
+def make_demo_user():
+    return {
+        "_id": ObjectId(DEMO_USER_ID),
+        "name": "Demo User",
+        "email": DEMO_EMAIL,
+        "phone": "+91 9876543210",
+        "password": DEMO_PW_HASH,
+        "balance": 4820.50,
+        "spent_today": 250.0,
+        "spent_month": 3200.0,
+        "monthly_limit": 8000.0,
+        "daily_limit": 2000.0,
+        "txn_limit": 5000.0,
+        "notify_pct": 80,
+        "cat_limits": {"food": 3000, "shopping": 2000, "travel": 1500, "other": 2500},
+        "cat_spent": {"food": 1200, "shopping": 850, "travel": 650, "other": 500},
+        "goals": [
+            {"id": "g1", "name": "Goa Trip", "target": 15000, "saved": 6500, "monthly": 1500, "icon_ti": "ti-plane", "icon_bg": "#eff6ff", "icon_fg": "#3b82f6"},
+            {"id": "g2", "name": "Emergency Fund", "target": 50000, "saved": 24000, "monthly": 3000, "icon_ti": "ti-shield", "icon_bg": "#eff6ff", "icon_fg": "#2563eb"}
+        ],
+        "upi_id": "demo@shieldwise",
+        "avatar": "D",
+        "created_at": datetime.datetime.utcnow(),
+        "updated_at": datetime.datetime.utcnow(),
+    }
+
+class InsertResult:
+    def __init__(self, inserted_id):
+        self.inserted_id = inserted_id
+
 class SafeCollection:
-    def __init__(self, name):
+    def __init__(self, name, initial_data=None):
         self.name = name
-        self._data = []
-    def find_one(self, filter=None, *args, **kwargs):
+        self._data = list(initial_data) if initial_data else []
+
+    def find_one(self, filter=None, projection=None, *args, **kwargs):
         if not filter:
-            return self._data[0] if self._data else None
+            return dict(self._data[0]) if self._data else None
         for item in self._data:
             match = True
             for k, v in filter.items():
-                if k == "_id" and str(item.get("_id")) == str(v):
-                    continue
-                if item.get(k) != v:
+                if k == "_id":
+                    if str(item.get("_id")) != str(v) and item.get("_id") != v:
+                        match = False
+                        break
+                elif item.get(k) != v:
                     match = False
                     break
             if match:
-                return item
+                return dict(item)
         return None
-    def find(self, *args, **kwargs):
+
+    def find(self, filter=None, *args, **kwargs):
+        matching = []
+        for item in self._data:
+            if not filter:
+                matching.append(dict(item))
+                continue
+            match = True
+            for k, v in filter.items():
+                if k == "_id":
+                    if str(item.get("_id")) != str(v) and item.get("_id") != v:
+                        match = False
+                        break
+                elif item.get(k) != v:
+                    match = False
+                    break
+            if match:
+                matching.append(dict(item))
+
         class Cursor:
             def __init__(self, items):
                 self._items = items
             def sort(self, *a, **k): return self
             def limit(self, *a, **k): return self
             def __iter__(self): return iter(self._items)
-        return Cursor(self._data)
+        return Cursor(matching)
+
     def insert_one(self, doc):
         if "_id" not in doc:
-            doc["_id"] = str(ObjectId())
+            doc["_id"] = ObjectId()
         self._data.append(doc)
-        return doc
+        return InsertResult(doc["_id"])
+
     def update_one(self, filter, update, *args, **kwargs):
         doc = self.find_one(filter)
-        if doc and "$set" in update:
-            doc.update(update["$set"])
+        if not doc:
+            return
+        for item in self._data:
+            if str(item.get("_id")) == str(doc.get("_id")):
+                if "$set" in update:
+                    item.update(update["$set"])
+                if "$push" in update:
+                    for k, v in update["$push"].items():
+                        if k not in item:
+                            item[k] = []
+                        item[k].append(v)
+                break
+
     def count_documents(self, filter=None, *args, **kwargs):
         if not filter:
             return len(self._data)
-        return sum(1 for item in self._data if all(item.get(k) == v for k, v in filter.items() if k != "_id"))
+        count = 0
+        for item in self._data:
+            match = True
+            for k, v in filter.items():
+                if k == "_id":
+                    if str(item.get("_id")) != str(v) and item.get("_id") != v:
+                        match = False
+                        break
+                elif item.get(k) != v:
+                    match = False
+                    break
+            if match:
+                count += 1
+        return count
 
-_safe_users = SafeCollection("users")
+_safe_users = SafeCollection("users", [make_demo_user()])
 _safe_fraud = SafeCollection("fraud_logs")
 _safe_txn   = SafeCollection("transaction_logs")
 
@@ -234,9 +315,21 @@ def login():
     email = data.get("email", "").strip().lower()
     password = data.get("password", "")
 
+    # Seamless Demo Account Login
+    if email == DEMO_EMAIL and (password == "test1234" or not password):
+        demo_user = users().find_one({"email": DEMO_EMAIL})
+        if not demo_user:
+            demo_user = make_demo_user()
+            users().insert_one(demo_user)
+        token = create_access_token(identity=str(demo_user["_id"]))
+        return jsonify({
+            "token": token,
+            "user":  {"name": demo_user["name"], "email": demo_user["email"], "avatar": demo_user.get("avatar", "D")}
+        }), 200
+
     user = users().find_one({"email": email})
     if not user or not bcrypt.check_password_hash(user["password"], password):
-        return jsonify({"error": "Invalid email or password"}), 401
+        return jsonify({"error": "Invalid email or password. Use test@shieldwise.com / test1234 for demo"}), 401
 
     token = create_access_token(identity=str(user["_id"]))
     return jsonify({
@@ -254,7 +347,11 @@ def get_profile():
     uid  = get_jwt_identity()
     user = users().find_one({"_id": ObjectId(uid)})
     if not user:
-        return jsonify({"error": "User not found"}), 404
+        if uid == DEMO_USER_ID:
+            user = make_demo_user()
+            users().insert_one(user)
+        else:
+            return jsonify({"error": "User not found"}), 404
     user.pop("password", None)
     return jsonify(obj_to_dict(user)), 200
 

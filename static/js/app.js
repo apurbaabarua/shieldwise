@@ -53,6 +53,12 @@ function authTab(t) {
   });
 }
 
+function fillDemoLogin() {
+  document.getElementById("l-email").value = "test@shieldwise.com";
+  document.getElementById("l-pass").value = "test1234";
+  doLogin();
+}
+
 async function doLogin() {
   var email = document.getElementById("l-email").value.trim();
   var pass  = document.getElementById("l-pass").value;
